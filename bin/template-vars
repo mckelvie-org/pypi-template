@@ -104,6 +104,20 @@ def get_template_vars(force_init: bool = False) -> TemplateVars:
                 author_name = None
         template_vars["AUTHOR_NAME"] = input_with_default("Enter the author's name", author_name)
         tv_dirty = True
+        
+    author_email = template_vars.get("AUTHOR_EMAIL")
+    if author_email is None:
+        author_email = pydev_config.get("authorEmail")
+        if author_email is None:
+            author_email = subprocess.run(
+                ["git", "config", "--global", "user.email"],
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            if author_email == "":
+                author_email = None
+        template_vars["AUTHOR_EMAIL"] = input_with_default("Enter the author's email", author_email)
+        tv_dirty = True
     
     license_full_name = template_vars.get("LICENSE_FULL_NAME")
     if license_full_name is None:
