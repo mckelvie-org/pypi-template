@@ -16,6 +16,7 @@ from pathlib import Path
 from string import Template
 from typing import TypeAlias
 
+TEMPLATE_VARS_APPLIED_FILE = ".template-vars-applied"
 TEMPLATE_VARS_FILE = ".template-vars.json"
 PYDEV_CONFIG_FILE = "~/.config/pydev/config.json"
 TEST_TEMPLATE_FILE = "tests/test_template.py"
@@ -57,6 +58,7 @@ def input_with_default(prompt: str, default: str | None=None) -> str:
             user_input = default
     return user_input
 
+template_vars_applied_file = project_dir / os.path.expanduser(TEMPLATE_VARS_APPLIED_FILE)
 pydev_config_file = project_dir / os.path.expanduser(PYDEV_CONFIG_FILE)
 template_vars_file = project_dir / os.path.expanduser(TEMPLATE_VARS_FILE)
 test_template_file = project_dir / os.path.expanduser(TEST_TEMPLATE_FILE)
@@ -217,6 +219,8 @@ def apply_test_changes() -> None:
 
 def apply_vars(force_init: bool = False) -> None:
     """Apply the template variables to all templated files."""
+    if not force_init and template_vars_applied_file.exists():
+        return
     get_template_vars(force_init=force_init)
     apply_package_src_change()
     apply_license_change()
@@ -225,6 +229,8 @@ def apply_vars(force_init: bool = False) -> None:
         file_path = project_dir / file_name
         if file_path.exists():
             apply_vars_to_file(file_path)
+            
+    template_vars_applied_file.touch()
             
 def main():
     parser = ArgumentParser(description="Initialize template variables for the project.")
