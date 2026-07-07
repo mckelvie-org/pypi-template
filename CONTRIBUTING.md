@@ -21,7 +21,7 @@ new pending publisher** (use "pending" because the project won't exist there yet
 | Field | Value |
 |---|---|
 | PyPI project name | `${GITHUB_PROJECT_NAME}` *(or your fork's package name)* |
-| Owner | `${GITHUB_OWNER}` *(or your fork's GitHub owner) |
+| Owner | `${GITHUB_OWNER_NAME}` *(or your fork's GitHub owner) |
 | Repository | `${GITHUB_PROJECT_NAME}` |
 | Workflow | `publish-test.yml` |
 | Environment | `testpypi` |
@@ -34,7 +34,7 @@ pending publisher**:
 | Field | Value |
 |---|---|
 | PyPI project name | `${GITHUB_PROJECT_NAME}` *(or your fork's package name)* |
-| Owner | `${GITHUB_OWNER}` *(or your fork's GitHub owner) |
+| Owner | `${GITHUB_OWNER_NAME}` *(or your fork's GitHub owner) |
 | Repository | `${GITHUB_PROJECT_NAME}` |
 | Workflow | `publish.yml` |
 | Environment | `pypi` |
