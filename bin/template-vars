@@ -14,7 +14,14 @@ from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 from string import Template
-from typing import TypeAlias
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # typing.TypeAlias requires Python 3.10+; this script must also run under the
+    # system Python 3.9 that bootstraps the project before a venv exists, so the
+    # import is type-checking-only (annotations are never evaluated at runtime,
+    # since `from __future__ import annotations` is in effect).
+    from typing import TypeAlias
 
 TEMPLATE_VARS_APPLIED_FILE = ".template-vars-applied"
 TEMPLATE_VARS_FILE = ".template-vars.json"
