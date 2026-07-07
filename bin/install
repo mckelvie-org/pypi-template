@@ -59,5 +59,7 @@ if [ ! -f "$PROJECT_ROOT/.pdm-python" ]; then
 fi
 pdm install
 
+pdm fix
+
 echo ""
 echo "Done.  Run 'pdm run test' to verify the setup."
