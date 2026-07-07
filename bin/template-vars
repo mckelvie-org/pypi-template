@@ -223,7 +223,7 @@ def apply_test_changes() -> None:
         
     if test_output_file.exists():
         apply_vars_to_file(test_output_file)
-
+        
 def apply_vars(force_init: bool = False) -> None:
     """Apply the template variables to all templated files."""
     if not force_init and template_vars_applied_file.exists():
