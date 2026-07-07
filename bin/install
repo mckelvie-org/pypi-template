@@ -54,6 +54,9 @@ MSG
 fi
 
 echo "Installing Python dependencies..."
+if [ ! -f "$PROJECT_ROOT/.pdm-python" ]; then
+    echo "$PROJECT_ROOT/.venv/bin/python" > "$PROJECT_ROOT/.pdm-python"
+fi
 pdm install
 
 echo ""
