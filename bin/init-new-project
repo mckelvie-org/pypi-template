@@ -7,7 +7,7 @@ PROJECT_ROOT=$( cd -- "$SCRIPT_DIR/.." &> /dev/null && pwd )
 
 cd "$PROJECT_ROOT"
 
-if [ -f "$PROJECT_DIR/.template-vars-applied" ]; then
+if [ -f "$PROJECT_ROOT/.template-vars-applied" ]; then
     echo "Project already initialized from template.  Skipping." >&2
 else
     # Set up a brand new project
