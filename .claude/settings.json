@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat ~/.claude/settings.json)",
+      "Read(//Users/sam/.claude/**)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Users/sam/.claude/settings.json'\\)\\)\")",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Users/sam/.claude/settings.json'\\)\\); print\\('valid JSON'\\)\")",
+      "Bash(python3 -c ' *)"
+    ],
+    "additionalDirectories": [
+      "/Users/sam/.claude"
+    ]
+  }
+}
