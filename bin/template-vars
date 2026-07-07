@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-This script initializes template variables in .template-vars.json, which will be used by init-project-from-template.py
-to initialize a new project from a template.
+This script initializes template variables in .template-vars.json, and applies template
+variables to various files in the project for initial setup of a new project.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from typing import TypeAlias
 
 TEMPLATE_VARS_FILE = ".template-vars.json"
 PYDEV_CONFIG_FILE = "~/.config/pydev/config.json"
+TEST_TEMPLATE_FILE = "tests/test_template.py"
 
 templated_files: list[str] = [
         "pyproject.toml",
@@ -56,8 +57,9 @@ def input_with_default(prompt: str, default: str | None=None) -> str:
             user_input = default
     return user_input
 
-pydev_config_file = Path(os.path.expanduser(PYDEV_CONFIG_FILE))
-template_vars_file = Path(os.path.expanduser(TEMPLATE_VARS_FILE))
+pydev_config_file = project_dir / os.path.expanduser(PYDEV_CONFIG_FILE)
+template_vars_file = project_dir / os.path.expanduser(TEMPLATE_VARS_FILE)
+test_template_file = project_dir / os.path.expanduser(TEST_TEMPLATE_FILE)
 
 if pydev_config_file.exists():
     with open(pydev_config_file) as f:
@@ -178,20 +180,33 @@ def apply_license_change() -> None:
                 f.write("\n".join(lines) + "\n")
                 
 def apply_package_src_change() -> None:
-    """Handle renaming the package source directory"""
+    """Handle renaming the package source directory and expanding vars in source files."""
     template_src_dir = project_dir / "package_src"
     package_src_dir = project_dir / template_vars["PYTHON_MODULE"]
     if not package_src_dir.exists() and template_src_dir.exists():
         # Rename the templated source directory to the new name
         template_src_dir.rename(package_src_dir)
-
-
+        
+    # Apply template variables to all .py files in the package source directory
+    for py_file in package_src_dir.rglob("*.py"):
+        apply_vars_to_file(py_file)
+        
+def apply_test_changes() -> None:
+    """Apply template variables to the test template file."""
+    test_output_file = project_dir / f"tests/test_{template_vars['PYTHON_MODULE']}.py"
+    if test_template_file.exists() and not test_output_file.exists():
+        # rename the test template file to the new name
+        test_template_file.rename(test_output_file)
+        
+    if test_output_file.exists():
+        apply_vars_to_file(test_output_file)
 
 def apply_vars(force_init: bool = False) -> None:
     """Apply the template variables to all templated files."""
     get_template_vars(force_init=force_init)
     apply_package_src_change()
     apply_license_change()
+    apply_test_changes()
     for file_name in templated_files:
         file_path = project_dir / file_name
         if file_path.exists():
