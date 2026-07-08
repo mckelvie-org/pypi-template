@@ -55,6 +55,11 @@ MSG
     echo "pdm $(pdm --version) installed"
 fi
 
+PDM_LOCK_EXISTS=
+if [ -f "$PROJECT_ROOT/pdm.lock" ]; then
+    PDM_LOCK_EXISTS=1
+fi
+
 echo "Installing Python dependencies..."
 if [ ! -f "$PROJECT_ROOT/.pdm-python" ]; then
     echo "$PROJECT_ROOT/.venv/bin/python" > "$PROJECT_ROOT/.pdm-python"
@@ -62,6 +67,12 @@ fi
 pdm install
 
 pdm fix
+
+# If pdm.lock was just created, commit it. this happens
+if [ -z "$PDM_LOCK_EXISTS" ] && [ -f "$PROJECT_ROOT/pdm.lock" ]; then
+    git add pdm.lock
+    git commit -m "Initial commit of pdm.lock after project creation"
+fi
 
 echo ""
 echo "Done.  Run 'pdm run test' to verify the setup."

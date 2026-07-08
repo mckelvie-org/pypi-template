@@ -128,7 +128,25 @@ def main() -> None:
     # Commit the changes to the new project repo
     subprocess.run(["git", "add", "."], check=True)
     subprocess.run(["git", "commit", "-m", "Initial commit from template"], check=True)
-
+    
+    # Create the github repo and push the local repo to it
+    subprocess.run(
+            [
+                    "gh",
+                    "repo",
+                    "create",
+                    f"{owner}/{project_name}",
+                    "--public",
+                    "--source=.",
+                    "--remote=origin",
+                    "--push"
+                ],
+            check=True
+        )
+    
+    # Initialize the github environment, etc., and initialize the local dev environment
+    subprocess.run([str(project_dir / "bin/init-new-project")], check=True)
+    
     print(f"New project '{project_name}' created successfully.")
 
 if __name__ == "__main__":
