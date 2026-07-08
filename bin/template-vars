@@ -2,6 +2,9 @@
 """
 This script initializes template variables in .template-vars.json, and applies template
 variables to various files in the project for initial setup of a new project.
+
+This script should remain compatible with the system Python 3.9 so it can run before
+a virtualenv is set up.
 """
 
 from __future__ import annotations
@@ -126,6 +129,18 @@ def get_template_vars(force_init: bool = False) -> TemplateVars:
             if author_email == "":
                 author_email = None
         template_vars["AUTHOR_EMAIL"] = input_with_default("Enter the author's email", author_email)
+        tv_dirty = True
+        
+    project_description = template_vars.get("PROJECT_DESCRIPTION")
+    if project_description is None:
+        project_description_json = subprocess.run(
+            ["gh", "repo", "view", "--json", "description"],
+            capture_output=True,
+            text=True,
+        ).stdout
+        project_description_dict = json.loads(project_description_json) if project_description_json else {}
+        project_description = project_description_dict.get("description")
+        template_vars["PROJECT_DESCRIPTION"] = input_with_default("Enter the project description", project_description)
         tv_dirty = True
     
     license_full_name = template_vars.get("LICENSE_FULL_NAME")
