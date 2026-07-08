@@ -1,11 +1,11 @@
-# json-data-types
+# ${PYTHON_PACKAGE}
 
 [![CI](https://github.com/mckelvie-org/${PYTHON_PACKAGE}/actions/workflows/ci.yml/badge.svg)](https://github.com/${GITHUB_OWNER_NAME}/${GITHUB_PROJECT_NAME}/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/${PYTHON_PACKAGE}.svg)](https://pypi.org/project/${PYTHON_PACKAGE}/)
 [![Python versions](https://img.shields.io/pypi/pyversions/${PYTHON_PACKAGE}.svg)](https://pypi.org/project/${PYTHON_PACKAGE}/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-`${PYTHON_PACKAGE}` provides <!-- TODO: Brief description of package purpose -->
+`${PYTHON_PACKAGE}`: {$PROJECT_DESCRIPTION}
 
 ## Highlights
 

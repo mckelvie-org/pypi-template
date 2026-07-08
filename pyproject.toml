@@ -5,7 +5,7 @@ build-backend = "pdm.backend"
 [project]
 name = "${PYTHON_PACKAGE}"
 version = "0.0.0-dev.1"
-description = "${PYTHON_PACKAGE} python package."
+description = "${PROJECT_DESCRIPTION}"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
