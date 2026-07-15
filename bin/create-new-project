@@ -10,9 +10,12 @@ import json
 import os
 import re
 import subprocess
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
     # typing.TypeAlias requires Python 3.10+; this script must also run under the
@@ -25,7 +28,30 @@ template_script_dir = Path(__file__).parent.resolve()
 template_project_dir = template_script_dir.parent.resolve()
 template_dir = template_project_dir / "src"
 template_project_url = "git@github.com:mckelvie-org/pypi-template.git"
-    
+
+def normalize_pypi_name(name: str) -> str:
+    """Normalize a project name per PEP 503, for comparison against index names."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+def pypi_project_exists(project_name: str, index_label: str, index_url: str) -> bool:
+    """Check whether a project name is already registered on a PyPI-compatible index.
+    Network failures are treated as inconclusive (warn and assume not taken) rather than
+    blocking project creation."""
+    normalized = normalize_pypi_name(project_name)
+    url = f"{index_url}/pypi/{normalized}/json"
+    request = Request(url, method="HEAD")
+    try:
+        with urlopen(request, timeout=10) as response:
+            return response.status == 200
+    except HTTPError as e:
+        if e.code == 404:
+            return False
+        print(f"warning: could not check {index_label} for existing project '{project_name}': HTTP {e.code}", file=sys.stderr)
+        return False
+    except URLError as e:
+        print(f"warning: could not check {index_label} for existing project '{project_name}': {e}", file=sys.stderr)
+        return False
+
 def main() -> None:
     parser = ArgumentParser(description="Create a new project from the template.")
     parser.add_argument(
@@ -46,6 +72,12 @@ def main() -> None:
         "--description",
         help="A short description of the new project. Defaults to \"Python package <project_name>\".",
         default=None,
+    )
+    parser.add_argument(
+        "--ignore-existing-pypi-project",
+        action="store_true",
+        help="Skip the check for an existing project of the same name on PyPI/TestPyPI. "
+             "Use this if you already own the name or have already configured a trusted publisher.",
     )
     args = parser.parse_args()
     
@@ -70,6 +102,15 @@ def main() -> None:
         raise ValueError(
             f"Project name must be lowercase and can only contain letters, numbers, and hyphens: '{project_name!r}'"
         )
+
+    if not args.ignore_existing_pypi_project:
+        for index_label, index_url in (("PyPI", "https://pypi.org"), ("TestPyPI", "https://test.pypi.org")):
+            if pypi_project_exists(project_name, index_label, index_url):
+                raise ValueError(
+                    f"A project named '{project_name}' already exists on {index_label}. "
+                    "Choose a different --project-name, or pass --ignore-existing-pypi-project "
+                    "if you already own this name or have already configured a trusted publisher."
+                )
 
     # Create the new project directory
     if project_dir.exists():
