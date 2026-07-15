@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-TEMPLTE_SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-TEMPLATE_PROJECT_ROOT=$( cd -- "$SCRIPT_DIR/.." &> /dev/null && pwd )
+TEMPLATE_SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+TEMPLATE_PROJECT_ROOT=$( cd -- "$TEMPLATE_SCRIPT_DIR/.." &> /dev/null && pwd )
 
-if [ -n "$1" ]; then
+if [ -n "${1:-}" ]; then
     PROJECT_ROOT="$1"
 else
     # Get the current git repo top-level directory
