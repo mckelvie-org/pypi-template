@@ -17,14 +17,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 from string import Template
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    # typing.TypeAlias requires Python 3.10+; this script must also run under the
-    # system Python 3.9 that bootstraps the project before a venv exists, so the
-    # import is type-checking-only (annotations are never evaluated at runtime,
-    # since `from __future__ import annotations` is in effect).
-    from typing import TypeAlias
+from typing import TypeAlias, cast
 
 TEMPLATE_VARS_APPLIED_FILE = ".template-vars-applied"
 TEMPLATE_VARS_FILE = ".template-vars.json"
@@ -41,9 +34,8 @@ templated_files: list[str] = [
 TemplateVars: TypeAlias = dict[str, str]
 
 script_dir = Path(__file__).parent.resolve()
-project_dir = script_dir.parent.resolve()
+template_project_dir = script_dir.parent.resolve()
 
-os.chdir(project_dir)
 
 def parse_github_owner_from_remote_url(remote_url: str) -> str:
     """Extract the owner/org name from a git remote URL. Handles HTTPS/ssh:// URLs
@@ -68,27 +60,40 @@ def input_with_default(prompt: str, default: str | None=None) -> str:
             user_input = default
     return user_input
 
-template_vars_applied_file = project_dir / os.path.expanduser(TEMPLATE_VARS_APPLIED_FILE)
-pydev_config_file = project_dir / os.path.expanduser(PYDEV_CONFIG_FILE)
-template_vars_file = project_dir / os.path.expanduser(TEMPLATE_VARS_FILE)
-test_template_file = project_dir / os.path.expanduser(TEST_TEMPLATE_FILE)
-
-if pydev_config_file.exists():
-    with open(pydev_config_file) as f:
-        pydev_config = json.load(f)
-else:
-    pydev_config = {}
-
+project_dir: Path
+template_vars_applied_file: Path
+pydev_config_file: Path
+template_vars_file: Path
+test_template_file: Path
+pydev_config: dict[str, str]
 template_vars: TemplateVars
 tv_dirty: bool = False
 tv_initialized: bool = False
-if template_vars_file.exists():
-    with open(template_vars_file) as f:
-        template_vars = json.load(f)
-else:
-    template_vars = {}
-    tv_dirty = True
-    
+
+def init_paths(project_directory: Path) -> None:
+    """Initialize global paths and config based on the project directory."""
+    global project_dir, template_vars_applied_file, pydev_config_file, template_vars_file, test_template_file, pydev_config
+    global template_vars, tv_dirty, tv_initialized
+    project_dir = project_directory
+    os.chdir(project_dir)
+    template_vars_applied_file = project_dir / os.path.expanduser(TEMPLATE_VARS_APPLIED_FILE)
+    pydev_config_file = project_dir / os.path.expanduser(PYDEV_CONFIG_FILE)
+    template_vars_file = project_dir / os.path.expanduser(TEMPLATE_VARS_FILE)
+    test_template_file = project_dir / os.path.expanduser(TEST_TEMPLATE_FILE)
+    if pydev_config_file.exists():
+        with open(pydev_config_file) as f:
+            pydev_config = json.load(f)
+    else:
+        pydev_config = {}
+
+    if template_vars_file.exists():
+        with open(template_vars_file) as f:
+            template_vars = json.load(f)
+    else:
+        template_vars = {}
+    tv_dirty = False
+    tv_initialized = False
+
 def flush_template_vars():
     """Flush the template variables to the .template-vars.json file."""
     global tv_dirty
@@ -266,9 +271,25 @@ def main():
         action="store_true",
         help="Apply the template variables to all templated files.",
     )
+    parser.add_argument(
+        "--project-dir",
+        type=Path,
+        default=None,
+        help="The project directory (default: The current git repo top-level directory).",
+    )
     args = parser.parse_args()
     force_init: bool = args.force_init
     apply: bool = args.apply
+    if args.project_dir is not None:
+        project_dir = Path(cast(str, args.project_dir))
+    else:
+        # Get the current git repo top-level directory
+        result = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            text=True,
+        )
+        project_dir = Path(result.strip())
+    init_paths(project_dir)
     get_template_vars(force_init=force_init)
     if apply:
         apply_vars(force_init=args.force_init)

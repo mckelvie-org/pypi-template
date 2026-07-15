@@ -21,8 +21,9 @@ if TYPE_CHECKING:
     # since `from __future__ import annotations` is in effect).
     pass
 
-script_dir = Path(__file__).parent.resolve()
-template_dir = script_dir.parent.resolve()
+template_script_dir = Path(__file__).parent.resolve()
+template_project_dir = template_script_dir.parent.resolve()
+template_dir = template_project_dir / "src"
 template_project_url = "git@github.com:mckelvie-org/pypi-template.git"
     
 def main() -> None:
@@ -48,7 +49,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     
-    subprocess.run([ str(script_dir / "install-gh-cli") ], check=True)
+    subprocess.run([ str(template_script_dir / "install-gh-cli") ], check=True)
     project_dir: Path = Path(args.project_dir).expanduser().resolve()
     project_name: str = args.project_name or project_dir.name
     project_description: str = args.description or f"Python package {project_name}"
@@ -120,10 +121,10 @@ def main() -> None:
         json.dump(template_vars, f, indent=2, sort_keys=True)
     
     # resolve additional template variables in the new project directory
-    subprocess.run([str(project_dir / "bin/template-vars")], check=True)
+    subprocess.run([str(template_script_dir / "template-vars")], check=True)
     
     # apply the template variables to the new project directory
-    subprocess.run([str(project_dir / "bin/template-vars"), "--apply"], check=True)
+    subprocess.run([str(template_script_dir / "template-vars"), "--apply"], check=True)
     
     # Commit the changes to the new project repo
     subprocess.run(["git", "add", "."], check=True)
@@ -145,7 +146,7 @@ def main() -> None:
         )
     
     # Initialize the github environment, etc., and initialize the local dev environment
-    subprocess.run([str(project_dir / "bin/init-new-project")], check=True)
+    subprocess.run([str(template_script_dir / "init-new-project")], check=True)
     
     print(f"New project '{project_name}' created successfully.")
 
