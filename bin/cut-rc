@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # Cut a release candidate by tagging the current HEAD of main.
-# Computes the next rc counter from existing tags, sets pyproject.toml to
-# X.Y.Z-rc.N in a worktree, and pushes the tag — triggering publish-test.yml.
+# Computes the next rc counter from existing tags (unique regardless of main's
+# current dev release number -- no need to bump that first), sets pyproject.toml
+# to X.Y.Z-rc.N in a worktree, and pushes the tag — triggering publish-test.yml.
 # Uses a git worktree so the dev's working directory is never modified.
+# Finally waits for that workflow to finish and reports its outcome.
 #
 # Usage: cut-rc [--force]
 #   --force  overwrite an existing tag (allows retrying a failed publish)
 set -euo pipefail
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "error: gh CLI not found in PATH — run bin/install-gh-cli, or open a new terminal if you just installed it" >&2
+    exit 1
+fi
 
 FORCE=0
 if [[ "${1:-}" == "--force" ]]; then
@@ -25,9 +32,10 @@ fi
 
 git fetch --force --tags origin main
 
-AHEAD=$(git rev-list origin/main..HEAD --count)
-if [[ "$AHEAD" -gt 0 ]]; then
-    echo "error: local main is $AHEAD commit(s) ahead of origin/main — push first" >&2
+LOCAL_SHA=$(git rev-parse HEAD)
+REMOTE_SHA=$(git rev-parse origin/main)
+if [[ "$LOCAL_SHA" != "$REMOTE_SHA" ]]; then
+    echo "error: local main ($LOCAL_SHA) is not in sync with origin/main ($REMOTE_SHA) — pull/rebase (and push, if you have local commits) first" >&2
     exit 1
 fi
 
@@ -132,6 +140,7 @@ PY
 
 git -C "$TMP" add pyproject.toml CHANGELOG.md README.md
 git -C "$TMP" commit -m "chore: release $RC_VERSION"
+RC_SHA=$(git -C "$TMP" rev-parse HEAD)
 
 if [[ "$FORCE" -eq 1 ]]; then
     git -C "$TMP" tag -f "v$RC_VERSION"
@@ -139,4 +148,46 @@ if [[ "$FORCE" -eq 1 ]]; then
 else
     git -C "$TMP" tag "v$RC_VERSION"
     git push origin "v$RC_VERSION"
+fi
+
+# Wait for the triggered Publish TestPyPI workflow and report its outcome. Unlike
+# cut-prod there's nothing to sync locally afterward -- this workflow only ever
+# updates the rc-latest tag, never main. Identify the run by its head commit SHA,
+# not `gh run list --branch` -- that flag isn't reliable for tag-triggered runs
+# (it filters on branch refs, not tag refs). Errors from `gh` are allowed to print
+# (not silenced) so an auth/API problem is visible instead of just "not found".
+# If no run has matched by SHA halfway through, fall back to the most recently
+# created run for this workflow -- for a solo/small-team repo, the newest run of
+# a workflow we just triggered is almost certainly the one we're waiting on.
+echo "Waiting for the Publish TestPyPI workflow to start..." >&2
+RUN_ID=""
+for attempt in $(seq 1 30); do
+    RUN_ID=$(gh run list --workflow=publish-test.yml --json databaseId,headSha --limit 20 \
+        --jq "[.[] | select(.headSha == \"$RC_SHA\")] | .[0].databaseId // empty") || true
+    if [[ -n "$RUN_ID" ]]; then
+        echo "Found run $RUN_ID for commit $RC_SHA." >&2
+        break
+    fi
+    if [[ "$attempt" -eq 15 ]]; then
+        FALLBACK_ID=$(gh run list --workflow=publish-test.yml --json databaseId --limit 1 --jq '.[0].databaseId // empty') || true
+        if [[ -n "$FALLBACK_ID" ]]; then
+            echo "No run matched commit $RC_SHA after $attempt attempts — falling back to the most recently created run for this workflow: $FALLBACK_ID" >&2
+            RUN_ID="$FALLBACK_ID"
+            break
+        fi
+    fi
+    sleep 2
+done
+
+if [[ -z "$RUN_ID" ]]; then
+    echo "warning: could not find the triggered Publish TestPyPI workflow run — check GitHub Actions manually" >&2
+    exit 0
+fi
+
+echo "Watching run $RUN_ID..." >&2
+if gh run watch "$RUN_ID" --exit-status; then
+    echo "Publish TestPyPI succeeded for v$RC_VERSION." >&2
+else
+    echo "error: Publish TestPyPI workflow failed — see the run above for details" >&2
+    exit 1
 fi

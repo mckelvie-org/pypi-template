@@ -43,9 +43,10 @@ pending publisher**:
 
 Once the above is in place:
 
-1. `bin/bump-dev` — iterate the dev version on `main`
-2. `bin/cut-rc` — pushes a `v*-rc.*` tag → triggers `publish-test.yml` → TestPyPI
-3. `bin/cut-prod` — pushes a `v*.*.*` tag → triggers `publish.yml` → PyPI + auto-bumps `main`
+1. (optional) `bin/bump-dev [patch|minor|major]` — for a deliberate semantic version bump on `main`
+2. `bin/cut-rc` — pushes a `v*-rc.*` tag → triggers `publish-test.yml` → TestPyPI, then waits for that workflow and reports its outcome
+3. `git checkout v<x.y.z>-rc.<n>` — check out the rc that TestPyPI just accepted
+4. `bin/cut-prod` — pushes a `v*.*.*` tag → triggers `publish.yml` → PyPI + auto-bumps `main`, then waits for that workflow and syncs your local `main`
 
 ---
 
@@ -79,7 +80,10 @@ dev versions always apear "newer" than rc or prod versions they are based on, an
 
 ### Bump the dev version
 
-Any time you like, you can bump the version number on the dev branch.
+Cutting an rc doesn't require bumping the dev release number first -- the rc counter
+(`X.Y.Z-rc.N`) is unique on its own, independent of whatever `N` `main`'s own `X.Y.Z-dev.N`
+currently carries. Use `bin/bump-dev` when you want a deliberate version bump ahead of time,
+most commonly a semantic one (a new `X.Y.Z`):
 
 ```bash
 bin/bump-dev [dev|patch|minor|major]   # edits pyproject.toml, does not commit
@@ -97,41 +101,68 @@ Commit and push to `main` before cutting a release.
 
 ### Cut a release candidate on TestPyPi
 
-First, bump the dev version to the version you want the release candidate to carry, if necessary.
-It is not necessary to be unique, since a unique build number will be added to the released version.
-
-Then, run from `main`:
+Run from `main`:
 
 ```bash
 bin/cut-rc [--force]
 ```
 
-This command reads `X.Y.Z-dev.N` from `pyproject.toml`, finds the next unused rc counter
-from existing `v<x.y.z>-rc.*` tags, sets the version to `X.Y.Z-rc.N` in a
-worktree, tags the commit `v<x.y.z>-rc.<n>`, and pushes the tag —
-triggering the `Publish TestPyPI` workflow.
+`cut-rc` first requires a clean working tree and local `main` to be exactly in sync with
+`origin/main` (any mismatch -- ahead, behind, or diverged -- is an error; pull/rebase and/or push
+to fix). From `main`'s current `X.Y.Z-dev.N`, it finds the next unused rc counter from existing
+`v<x.y.z>-rc.*` tags, sets the version to `X.Y.Z-rc.N` in a worktree, tags the commit
+`v<x.y.z>-rc.<n>`, and pushes the tag — triggering the `Publish TestPyPI` workflow.
 
-After a successful publish the workflow updates the `rc-latest` tag.
+`cut-rc` then waits for that workflow and shows its live status. The workflow itself polls
+TestPyPI until the version is actually visible there before reporting success (the upload API call
+succeeding doesn't mean the index has caught up yet -- there's a brief propagation window), and
+updates the `rc-latest` tag. If the workflow fails, `cut-rc` reports it and exits non-zero.
 
 Use `--force` to overwrite an existing tag and retry a failed publish.
 
 ### Cut a production release
 
-If you have already published a release candidate, the rc-latest tag should already reflect the version you want
-to publish. Run from anywhere on the repo:
+`cut-prod` promotes an rc that has *already been published to TestPyPI* -- it isn't just working
+from a version string, it verifies the rc is really there. The recommended flow is to check out
+the rc tag first, so you're never sitting on `main` (and therefore never at risk of doing new work
+on `main`) while a release is in flight:
 
 ```bash
-bin/cut-prod [--force] [RC_REF]
+git checkout v<x.y.z>-rc.<n>
+bin/cut-prod [--force]
 ```
 
-`RC_REF` is optional. Resolution order:
+`RC_REF` (`bin/cut-prod [--force] [RC_REF]`) is optional. Resolution order:
 1. Explicit argument (tag, sha, or bare version like `1.0.5-rc.1`).
-2. `HEAD`, if `pyproject.toml` in the working tree carries an `X.Y.Z-rc.N` version.
-3. The `rc-latest` tag (the most recently published rc).
+2. `HEAD`, if it is itself tagged with a `v<x.y.z>-rc.<n>` tag (the normal case after `git checkout` above).
+3. The `rc-latest` tag (the most recently published rc), if HEAD isn't tagged.
 
-Strips the rc qualifier, commits to a worktree, tags the commit `v<x.y.z>`,
-and pushes the tag — triggering `Publish`, which updates `prod-latest` and
-auto-bumps `main` to `X.Y.(Z+1)-dev.1` after a successful PyPI push.
+`cut-prod` requires:
+- A clean working tree.
+- If you're on a named branch (rather than detached at an rc tag), that branch must be exactly in
+  sync with its upstream -- no local-only commits. A detached rc checkout has nothing to sync,
+  since the commit is already reachable from origin via its tag.
+- The resolved rc version must actually exist on TestPyPI (checked directly against
+  `test.pypi.org`, with a short retry to ride out any residual index-propagation lag) --
+  promoting an rc that never successfully published is refused.
+
+It also warns (without blocking) if `origin/main` has moved since the rc was cut, in case that
+matters to you.
+
+Strips the rc qualifier, commits to a worktree, tags the commit `v<x.y.z>`, and pushes the tag —
+triggering `Publish`, which (like `Publish TestPyPI`) polls PyPI until the version is actually
+visible before reporting success, updates `prod-latest`, and then ensures `main` carries a dev version
+strictly ahead of the one just published, bumping to `X.Y.(Z+1)-dev.1` if needed. This is safe with
+other developers landing commits on `main`, or another release racing to bump it at the same time:
+every attempt re-fetches the live tip of `main` and re-evaluates whether a bump is still needed from
+scratch, rather than trusting a stale snapshot, and retries a few times if its push loses a race
+(the winner's bump may already satisfy the requirement, in which case there's nothing left to do).
+
+After pushing the prod tag, `cut-prod` waits for the triggered `Publish` workflow to finish and
+shows its live status. On success, it syncs your local `main` with `origin/main` (which the
+workflow may have just bumped) -- rebasing in place if `main` is your current branch, or otherwise
+just fast-forwarding the local `main` ref without touching your current (normally still-detached)
+checkout. On failure, it reports the error and exits non-zero; `main` is left alone.
 
 Use `--force` to overwrite an existing tag and retry a failed publish.
 
