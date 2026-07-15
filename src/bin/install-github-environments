@@ -49,7 +49,34 @@ fi
 
 # ── environments ──────────────────────────────────────────────────────────────
 
+# let gh resolve the owner and project name from the current repo (it already
+# handles every remote URL format internally, so no need to parse it ourselves)
+read -r GITHUB_OWNER_NAME GITHUB_PROJECT_NAME < <(gh repo view --json owner,name -q '[.owner.login, .name] | @tsv')
+
+if [[ -z "$GITHUB_OWNER_NAME" || -z "$GITHUB_PROJECT_NAME" ]]; then
+    echo "error: could not determine owner/repo via 'gh repo view'" >&2
+    exit 1
+fi
+
 for ENV in testpypi pypi; do
     gh api --method PUT "repos/{owner}/{repo}/environments/${ENV}" --silent
     echo "environment '${ENV}' ready"
 done
+
+echo
+
+echo "Please add the GitHub testpypi environment as a trusted publisher on https://test.pypi.org/manage/account/publishing/ (GitHub tab):"
+echo "    PyPI project name: ${GITHUB_PROJECT_NAME}"
+echo "                Owner: ${GITHUB_OWNER_NAME}"
+echo "           Repository: ${GITHUB_PROJECT_NAME}"
+echo "             Workflow: publish-test.yml"
+echo "          Environment: testpypi"
+
+echo
+
+echo "Please add the GitHub pypi environment as a trusted publisher on https://pypi.org/manage/account/publishing/ (GitHub tab):"
+echo "    PyPI project name: ${GITHUB_PROJECT_NAME}"
+echo "                Owner: ${GITHUB_OWNER_NAME}"
+echo "           Repository: ${GITHUB_PROJECT_NAME}"
+echo "             Workflow: publish.yml"
+echo "          Environment: pypi"
